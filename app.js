@@ -35,6 +35,7 @@ function extractRoomId(text = "") {
 // =====================
 accounts.forEach((acc, index) => {
 if (index !== 10) return;
+  
   const service = new WOLF();
 
   // 📦 طابور + منع تكرار لكل حساب
