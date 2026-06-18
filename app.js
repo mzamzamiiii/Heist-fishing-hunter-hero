@@ -20,78 +20,63 @@ const accounts = [
   { identity: process.env.U_MAIL_14, secret: process.env.U_PASS_14 }
 ];
 
+// [] = تشغيل جميع الحسابات
+// [13] = تشغيل الحساب 13 فقط
+// [13, 14] = تشغيل الحسابين 13 و14
+// [1, 5, 11] = تشغيل الحسابات 1 و5 و11
+const ACTIVE_ACCOUNTS = [13];
+
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-// =====================
-// 🔥 استخراج Room ID
-// =====================
 function extractRoomId(text = "") {
   const cleaned = text
-    .replace(/[\u200B-\u200F\uFEFF]/g, '') // إزالة الرموز المخفية
+    .replace(/[\u200B-\u200F\uFEFF]/g, '')
     .replace(/\s+/g, ' ');
 
-  // 1) (ID 123)
   let match = cleaned.match(/\(ID\s*(\d+)\)/i);
 
-  // 2) (123)
-  if (!match) {
-    match = cleaned.match(/\((\d+)\)/);
-  }
-
-  // 3) fallback: أي رقم كبير داخل النص
-  if (!match) {
-    match = cleaned.match(/\b(\d{3,})\b/);
-  }
+  if (!match) match = cleaned.match(/\((\d+)\)/);
+  if (!match) match = cleaned.match(/\b(\d{3,})\b/);
 
   return match ? Number(match[1]) : null;
 }
 
-// =====================
-// 🤖    شيل السطر تبع اف ويرجع يشتغل كل الحسابات كل حساب مستقل
-// =====================
-accounts.forEach((acc, index) => {  
+accounts.forEach((acc, index) => {
+  if (
+    ACTIVE_ACCOUNTS.length > 0 &&
+    !ACTIVE_ACCOUNTS.includes(index + 1)
+  ) {
+    return;
+  }
+
   const service = new WOLF();
 
-  // 📦 طابور + منع تكرار لكل حساب
   let queue = [];
-  let queueSet = new Set(); // لمنع التكرار
+  let queueSet = new Set();
   let isProcessing = false;
-
-  // ⏱️ نظام الراحة
   let isResting = false;
 
   const WORK_TIME = 54 * 60 * 1000;
   const REST_TIME = 6 * 60 * 1000;
   const DELAY = 12000;
 
-  // =====================
-  // 📥 إضافة للروم (بدون تكرار + أولوية جديدة)
-  // =====================
   function addToQueue(roomId) {
     if (!roomId) return;
-
-    // 🔴 منع التكرار
     if (queueSet.has(roomId)) return;
 
     queueSet.add(roomId);
-
-    // 🔥 أولوية للرومات الجديدة (تدخل أول الطابور)
     queue.unshift(roomId);
   }
 
-  // =====================
-  // 🔁 تنفيذ الطابور
-  // =====================
   async function processQueue() {
     if (isProcessing) return;
     isProcessing = true;
 
     while (queue.length > 0) {
-
       if (isResting) break;
 
       const roomId = queue.shift();
-      queueSet.delete(roomId); // إزالة من قائمة التكرار
+      queueSet.delete(roomId);
 
       try {
         if (service.groups?.join) {
@@ -105,7 +90,6 @@ accounts.forEach((acc, index) => {
         await service.messaging.sendGroupMessage(roomId, "!اسرق 5");
 
         console.log(`🚀 [${index + 1}] نفذ على ${roomId}`);
-
       } catch (err) {
         console.log(`❌ [${index + 1}] خطأ:`, err.message);
       }
@@ -116,9 +100,6 @@ accounts.forEach((acc, index) => {
     isProcessing = false;
   }
 
-  // =====================
-  // 📩 استقبال الرسائل
-  // =====================
   service.on('message', async (message) => {
     if (message.isGroup) return;
 
@@ -149,12 +130,8 @@ accounts.forEach((acc, index) => {
     }
   });
 
-  // =====================
-  // ⏱️ دورة 54 / 6
-  // =====================
   async function cycle() {
     while (true) {
-
       console.log(`🟢 [${index + 1}] تشغيل 54 دقيقة`);
       isResting = false;
 
