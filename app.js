@@ -26,15 +26,24 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 // 🔥 استخراج Room ID
 // =====================
 function extractRoomId(text = "") {
-  const cleaned = text.replace(/[\u200B-\u200F\uFEFF]/g, '');
+  const cleaned = text
+    .replace(/[\u200B-\u200F\uFEFF]/g, '') // إزالة الرموز المخفية
+    .replace(/\s+/g, ' ');
 
-  const match = cleaned.match(/\]\s*\((\d+)\)/);
+  // 1) (ID 123)
+  let match = cleaned.match(/\(ID\s*(\d+)\)/i);
 
-  if (match) {
-    return parseInt(match[1], 10);
+  // 2) (123)
+  if (!match) {
+    match = cleaned.match(/\((\d+)\)/);
   }
 
-  return null;
+  // 3) fallback: أي رقم كبير داخل النص
+  if (!match) {
+    match = cleaned.match(/\b(\d{3,})\b/);
+  }
+
+  return match ? Number(match[1]) : null;
 }
 
 // =====================
