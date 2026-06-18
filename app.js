@@ -27,9 +27,14 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 // =====================
 function extractRoomId(text = "") {
   const cleaned = text.replace(/[\u200B-\u200F\uFEFF]/g, '');
-  const match = cleaned.match(/ID\s*(\d{5,})|\((\d{5,})\)/);
-  const id = match?.[1] || match?.[2];
-  return id ? parseInt(id, 10) : null;
+
+  const match = cleaned.match(/\]\s*\((\d+)\)/);
+
+  if (match) {
+    return parseInt(match[1], 10);
+  }
+
+  return null;
 }
 
 // =====================
