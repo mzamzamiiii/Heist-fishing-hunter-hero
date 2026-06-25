@@ -4,11 +4,15 @@ import wolfjs from 'wolf.js';
 const { WOLF } = wolfjs;
 
 // ==================================================
-// ⚙️ الإعدادات الأساسية
+// ⚙️ الإعدادات (أضف أرقام الـ ID الخاصة بالبوتات هنا)
 // ==================================================
 
-// ضع هنا الـ ID الخاص بـ Heist Bot الذي استخرجته من الصورة
-const HEIST_BOT_ID = 0; 
+const BOTS_DATA = {
+  "39369782": { command: "!اسرق ٥", name: "Heist Bot" },
+  "32060007": { command: "!صيد ٣",   name: "Fishing Bot" },
+  "76305584": { command: "!صياد ٣",  name: "Hunter Bot" },
+  "45578849": { command: "!بطل ٥",   name: "Hero Bot" }
+};
 
 const accounts = [
   { identity: process.env.U_MAIL_1, secret: process.env.U_PASS_1 },
@@ -27,20 +31,8 @@ const accounts = [
   { identity: process.env.U_MAIL_14, secret: process.env.U_PASS_14 }
 ];
 
-// [] = تشغيل جميع الحسابات
-// [13] = تشغيل الحساب 13 فقط
-const ACTIVE_ACCOUNTS = [13];
-
-// [] = استقبال المعزز من أي عضوية
-const ALLOWED_BONUS_SENDERS = [];
-
-// الكلمة / الأمر الذي يرسله داخل الغرفة
-const SEND_COMMAND = "!اسرق 5";
-
-// وقت الانتظار بين كل غرفة وغرفة
+const ACTIVE_ACCOUNTS = [10];
 const DELAY = 12000;
-
-// وقت التشغيل والراحة
 const WORK_TIME = 54 * 60 * 1000;
 const REST_TIME = 6 * 60 * 1000;
 
@@ -48,66 +40,33 @@ const REST_TIME = 6 * 60 * 1000;
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
+// هذه الدالة الآن تأخذ الرقم الأول فقط وتتجاهل أي شيء بعده
 function extractRoomId(text = "") {
-  const cleaned = text
-    .replace(/[\u200B-\u200F\uFEFF]/g, '')
-    .replace(/\s+/g, ' ');
-
-  let match = cleaned.match(/\(ID\s*(\d+)\)/i);
-
-  if (!match) {
-    match = cleaned.match(/\((\d+)\)/);
-  }
-
-  if (!match) {
-    match = cleaned.match(/\b(\d{3,})\b/);
-  }
-
+  // تنظيف النص من الرموز الخفية
+  const cleaned = text.replace(/[\u200B-\u200F\uFEFF]/g, '').replace(/\s+/g, ' ');
+  
+  // الأولوية دائماً للبحث عن النمط الأول (ID XXX) أو (XXX)
+  // وبما أننا نستخدم match() فهي ستجد أول رقم مطابق وتتوقف فوراً (وهذا المطلوب)
+  const match = cleaned.match(/\(ID\s*(\d+)\)/i) || cleaned.match(/\((\d+)\)/);
+  
   return match ? Number(match[1]) : null;
 }
 
-function extractSenderId(text = "") {
-  const cleaned = text
-    .replace(/[\u200B-\u200F\uFEFF]/g, '')
-    .replace(/\s+/g, ' ');
-
-  const matches = [...cleaned.matchAll(/\(ID\s*(\d+)\)|\((\d+)\)/gi)];
-
-  if (matches.length < 2) return null;
-
-  const last = matches[matches.length - 1];
-  return Number(last[1] || last[2]);
-}
-
 function isBonusMessage(content = "") {
-  return (
-    /Bonus-/i.test(content) ||
-    content.includes("معزز") ||
-    content.includes("معزز إضافي")
-  );
+  return /Bonus-/i.test(content) || content.includes("معزز") || content.includes("معزز إضافي");
 }
 
 accounts.forEach((acc, index) => {
-  if (
-    ACTIVE_ACCOUNTS.length > 0 &&
-    !ACTIVE_ACCOUNTS.includes(index + 1)
-  ) {
-    return;
-  }
+  if (ACTIVE_ACCOUNTS.length > 0 && !ACTIVE_ACCOUNTS.includes(index + 1)) return;
 
   const service = new WOLF();
-
   let queue = [];
-  let queueSet = new Set();
   let isProcessing = false;
   let isResting = false;
 
-  function addToQueue(roomId) {
+  function addToQueue(roomId, command) {
     if (!roomId) return;
-    if (queueSet.has(roomId)) return;
-
-    queueSet.add(roomId);
-    queue.unshift(roomId);
+    queue.unshift({ roomId, command });
   }
 
   async function processQueue() {
@@ -117,84 +76,49 @@ accounts.forEach((acc, index) => {
     while (queue.length > 0) {
       if (isResting) break;
 
-      const roomId = queue.shift();
-      queueSet.delete(roomId);
+      const { roomId, command } = queue.shift();
 
       try {
-        if (service.groups?.join) {
-          await service.groups.join(roomId);
-        } else if (service.group?.join) {
-          await service.group.join(roomId);
-        } else if (service.joinGroup) {
-          await service.joinGroup(roomId);
-        }
+        if (service.groups?.join) await service.groups.join(roomId);
+        else if (service.group?.join) await service.group.join(roomId);
+        else if (service.joinGroup) await service.joinGroup(roomId);
 
-        await service.messaging.sendGroupMessage(roomId, SEND_COMMAND);
-
-        console.log(`🚀 [حساب ${index + 1}] دخل ${roomId} وأرسل: ${SEND_COMMAND}`);
-
+        await service.messaging.sendGroupMessage(roomId, command);
+        console.log(`🚀 [حساب ${index + 1}] دخل ${roomId} وأرسل: ${command}`);
       } catch (err) {
         console.log(`❌ [حساب ${index + 1}] خطأ:`, err.message);
       }
-
       await sleep(DELAY);
     }
-
     isProcessing = false;
   }
 
   service.on('message', async (message) => {
-    // تجاهل رسائل المجموعات
     if (message.isGroup) return;
 
-    // --- التعديل الجديد ---
-    // تجاهل أي رسالة لا تأتي من ID البوت المحدد
-    if (message.sourceSubscriberId !== HEIST_BOT_ID) return;
-    // -----------------------
+    const senderId = message.sourceSubscriberId.toString();
+    const botInfo = BOTS_DATA[senderId];
 
-    const content =
-      message.body ||
-      message.content ||
-      message.text ||
-      message.message ||
-      "";
+    if (!botInfo) return; 
 
+    const content = message.body || message.content || message.text || message.message || "";
     if (!isBonusMessage(content)) return;
 
     const roomId = extractRoomId(content);
     if (!roomId) return;
 
-    const bonusSenderId = extractSenderId(content);
+    console.log(`📥 [حساب ${index + 1}] استلمت من ${botInfo.name} | غرفة: ${roomId} | أمر: ${botInfo.command}`);
 
-    if (
-      ALLOWED_BONUS_SENDERS.length > 0 &&
-      !ALLOWED_BONUS_SENDERS.includes(bonusSenderId)
-    ) {
-      console.log(`⛔ [حساب ${index + 1}] تجاهل معزز من عضوية: ${bonusSenderId}`);
-      return;
-    }
+    addToQueue(roomId, botInfo.command);
 
-    console.log(`📥 [حساب ${index + 1}] غرفة: ${roomId} | صاحب المعزز: ${bonusSenderId}`);
-
-    addToQueue(roomId);
-
-    if (!isResting) {
-      processQueue();
-    }
+    if (!isResting) processQueue();
   });
 
   async function cycle() {
     while (true) {
-      console.log(`🟢 [حساب ${index + 1}] تشغيل 54 دقيقة`);
       isResting = false;
-
-      processQueue();
-
       await sleep(WORK_TIME);
-
-      console.log(`🛑 [حساب ${index + 1}] راحة 6 دقائق`);
       isResting = true;
-
       await sleep(REST_TIME);
     }
   }
