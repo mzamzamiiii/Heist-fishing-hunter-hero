@@ -3,6 +3,13 @@ import wolfjs from 'wolf.js';
 
 const { WOLF } = wolfjs;
 
+// ==================================================
+// ⚙️ الإعدادات الأساسية
+// ==================================================
+
+// ضع هنا الـ ID الخاص بـ Heist Bot الذي استخرجته من الصورة
+const HEIST_BOT_ID = 0; 
+
 const accounts = [
   { identity: process.env.U_MAIL_1, secret: process.env.U_PASS_1 },
   { identity: process.env.U_MAIL_2, secret: process.env.U_PASS_2 },
@@ -20,17 +27,11 @@ const accounts = [
   { identity: process.env.U_MAIL_14, secret: process.env.U_PASS_14 }
 ];
 
-// ==================================================
-// ⚙️ الإعدادات السهلة
-// ==================================================
-
 // [] = تشغيل جميع الحسابات
 // [13] = تشغيل الحساب 13 فقط
-// [13, 14] = تشغيل الحسابين 13 و14
 const ACTIVE_ACCOUNTS = [13];
 
 // [] = استقبال المعزز من أي عضوية
-
 const ALLOWED_BONUS_SENDERS = [];
 
 // الكلمة / الأمر الذي يرسله داخل الغرفة
@@ -143,7 +144,13 @@ accounts.forEach((acc, index) => {
   }
 
   service.on('message', async (message) => {
+    // تجاهل رسائل المجموعات
     if (message.isGroup) return;
+
+    // --- التعديل الجديد ---
+    // تجاهل أي رسالة لا تأتي من ID البوت المحدد
+    if (message.sourceSubscriberId !== HEIST_BOT_ID) return;
+    // -----------------------
 
     const content =
       message.body ||
